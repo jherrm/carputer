@@ -585,7 +585,7 @@ def main():
 
                 else:
                         # Send output data to arduinos.
-                        process_output(old_steering, old_throttle, steering, throttle, port_out)
+                        # process_output(old_steering, old_throttle, steering, throttle, port_out)
                         old_steering = steering
                         old_throttle = throttle
 
