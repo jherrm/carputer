@@ -25,8 +25,8 @@ import key_watcher
 import manual_throttle_map
 
 # Data logging
-import debug_message as dm
-data_logger = dm.DebugMessage(verbose=True, enable_logging=True)
+import debug_message
+data_logger = debug_message.DebugMessage(verbose=True, enable_logging=True)
 
 # Kartputer modules
 main_car_directory = os.path.dirname(os.path.realpath(__file__))
@@ -111,6 +111,7 @@ def make_data_folder(base_path):
 	session_full_path = os.path.join(base_path, session_dir_name)
 
 	logging_path = session_full_path + "_imu.log"
+
 	data_logger.init_logging(logging_path)
 
 	if not os.path.exists(session_full_path):
@@ -154,7 +155,7 @@ def process_imu(imu_port):
 def process_input(port_in, port_out):
 	"""Reads steering, throttle, aux1 and button data reported from the arduinos.
 
-	Returns: (steering, throttle, button_arduino_in, button_arduino_out)
+        Returns: (steering: int, throttle: int, aux1: int, button_arduino_in: int, button_arduino_out: int)
 
 	Return values may be None if the data from the arduino isn't related to the
 	steering or throttle.
@@ -427,11 +428,11 @@ def main():
 	last_millis_queue = []
 
 	# Check for insomnia
-	if platform.system() == "Darwin":
-		check_for_insomnia()
+	#if platform.system() == "Darwin":
+	#	check_for_insomnia()
 
 	# Setup ports.
-	port_in, port_out, imu_port = setup_serial_and_reset_arduinos()
+	# port_in, port_out, imu_port = setup_serial_and_reset_arduinos()
 
 	# Setup tensorflow
 	sess, net_model = setup_tensorflow()
@@ -443,7 +444,8 @@ def main():
 	if we_are_autonomous:
 		print("Warning, we are intending to drive with tensorflow")
 
-	session_full_path = make_data_folder('~/training-images')
+	session_full_path = make_data_folder('./training-images')
+        os.mkdirp(session_full_path)
 
 	while True:
 		loop_start_time = time.time()
@@ -477,16 +479,16 @@ def main():
 				currently_running = False
 
 		# Read input data from arduinos.
-		new_steering, new_throttle, new_aux1, button_arduino_in, button_arduino_out = (
-			process_input(port_in, port_out))
-		if new_steering != None:
-			steering = new_steering
-		if new_throttle != None:
-			throttle = new_throttle
-		if new_aux1 != None:
-			aux1 = new_aux1
+		# new_steering, new_throttle, new_aux1, button_arduino_in, button_arduino_out = (
+		# 	process_input(port_in, port_out))
+		# if new_steering != None:
+		# 	steering = new_steering
+		# if new_throttle != None:
+		# 	throttle = new_throttle
+		# if new_aux1 != None:
+		# 	aux1 = new_aux1
 
-		telemetry = process_imu(imu_port)
+		# telemetry = process_imu(imu_port)
 		
 
 		# Check to see if we should stop the car via the RC during TF control.
