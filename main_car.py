@@ -15,15 +15,11 @@ import errno
 
 import cv2
 from docopt import docopt
-import numpy as np
-import platform
 import serial
 import tensorflow as tf
 
 import camera
 import key_watcher
-
-import manual_throttle_map
 
 # Data logging
 import debug_message
@@ -68,8 +64,6 @@ key_watcher.KeyWatcher(last_key).start()
 buffer_in = ''
 buffer_out = ''
 milliseconds = 0.0
-last_odometer_reset = 0
-odometer_ticks = 0
 button_arduino_out = 0
 button_arduino_in = 0
 
@@ -84,6 +78,7 @@ def mkdir_p(path):
             pass
         else:
             raise
+
 
 def touch(path):
     with open(path, 'a'):
@@ -103,18 +98,20 @@ def setup_serial_and_reset_arduinos():
                 name_out = 'COM4'
         else:
                 name_in = '/dev/tty.usbmodem14211'  # 5v Arduino Uno (16 bit)
-                name_out = '/dev/tty.usbmodem14231'  # 3.3v Arduino Due (32 bit)
+                name_out = '/dev/tty.usbmodem1411'  # 3.3v Arduino Due (32 bit)
         # 5 volt Arduino Duemilanove, radio controller for input.
-        port_in = serial.Serial(name_in, 38400, timeout=0.0)
+        port_in = None
+        # port_in = serial.Serial(name_in, 38400, timeout=0.0)
         # 3 volt Arduino Due, servos for output.
         port_out = serial.Serial(name_out, 115200, timeout=0.0)
 
-        imu_port = serial.Serial('/dev/tty.usbmodem14241', 115200, timeout=0.0)
-        
+        imu_port = None
+        # imu_port = serial.Serial('/dev/tty.usbmodem14241', 115200, timeout=0.0)
+
         # Flush for good luck. Not sure if this does anything. :)
-        port_in.flush()
+        # port_in.flush()
         port_out.flush()
-        imu_port.flush()
+        # imu_port.flush()
         print("Serial setup complete.")
         return port_in, port_out, imu_port
 
@@ -135,39 +132,6 @@ def make_data_folder(base_path):
                 os.makedirs(session_full_path)
         return session_full_path
 
-def process_imu(imu_port):
-
-        global imu_stream
-        try:
-                imu_stream += imu_port.read(imu_port.in_waiting).decode('ascii')
-
-        except UnicodeDecodeError:
-                imu_stream = ''
-                print("Imu stream read error")
-        telemetry = None
-
-        while '\n' in imu_stream:
-                line, imu_stream = imu_stream.split('\n', 1)
-                if line[0:3] == 'IMU':
-                        # quat.xyzw, gyro.xyz, acc.xyz
-                        # IMU -0.0233 -0.0109 -0.0178 0.9995 0.0000 0.0000 0.0000 0.0400 -0.0400 0.1900
-                        sp = line.split(' ')
-                        try:
-                                quat = [float(sp[1]), float(sp[2]), float(sp[3]), float(sp[4])]
-                        except:
-                                quat = [0.0, 0.0, 0.0, 0.0]
-                        try:
-                                gyro = [float(sp[5]), float(sp[6]), float(sp[7])]
-                        except:
-                                gyro = [0.0, 0.0, 0.0]
-                        try:
-                                accel = [float(sp[8]), float(sp[9]), float(sp[10])]
-                        except:
-                                accel = [0.0, 0.0, 0.0]
-                        telemetry = quat + gyro + accel
-        return telemetry
-
-
 
 def process_input(port_in, port_out):
         """Reads steering, throttle, aux1 and button data reported from the arduinos.
@@ -178,7 +142,7 @@ def process_input(port_in, port_out):
         steering or throttle.
         """
         # Input is buffered because sometimes partial lines are read
-        global button_arduino_in, button_arduino_out, buffer_in, buffer_out, odometer_ticks, milliseconds
+        global button_arduino_in, button_arduino_out, buffer_in, buffer_out, milliseconds
         try:
                 buffer_in += port_in.read(port_in.in_waiting).decode('ascii')
                 buffer_out += port_out.read(port_out.in_waiting).decode('ascii')
@@ -191,7 +155,6 @@ def process_input(port_in, port_out):
                 print("Mysterious serial port error. Let's pretend it didn't happen. :)")
         # Init steering, throttle and aux1.
         steering, throttle, aux1 = None, None, None
-        telemetry = None
         # Read lines from input Arduino
         while '\n' in buffer_in:
                 line, buffer_in = buffer_in.split('\n', 1)
@@ -210,7 +173,6 @@ def process_input(port_in, port_out):
                 if line[0:3] == 'Mil':
                         sp = line.split('\t')
                         milliseconds = int(sp[1])
-                        odometer_ticks += 1
                 if line[0:3] == 'IMU':
                         pass
                                                 # quat.xyzw, gyro.xyz, acc.xyz
@@ -251,7 +213,6 @@ def process_output(old_steering, old_throttle, steering, throttle, port_out):
         port_out.flush()
 
 
-
 def stop_car(steering, throttle, port_out):
 
         # Send 90
@@ -266,11 +227,13 @@ def stop_car(steering, throttle, port_out):
         process_output(-1, -1, 90, 0, port_out)
         time.sleep(0.016)
 
+
 def center_esc(port_out):
         # 90 Throttle centers the esc 
         process_output(-1, -1, 90, 90, port_out)
 
         #process_output(-1, -1, steering, throttle, port_out)
+
 
 def invert_log_bucket(a):
         # Reverse the function that buckets the steering for neural net output.
@@ -321,6 +284,7 @@ def setup_tensorflow():
                                 # sys.exit(-1)
 
                 return sess, net_model
+
 
 def do_tensorflow(sess, net_model, frame, odo_ticks, vel):
         # Resize our image from the car
@@ -411,6 +375,7 @@ def do_tensorflow(sess, net_model, frame, odo_ticks, vel):
 #               throttle = int(throttle[0][0] + 90)
 #               return steering, throttle
 
+
 # This checks that we are running the program that allows us to close the lid of our mac and keep running.
 def check_for_insomnia():
         print("Checking for Insomnia (necessary for everything to work during lid close)")
@@ -423,8 +388,8 @@ def check_for_insomnia():
                 print "How are you gonna drive a car if your driver is asleep?"
                 sys.exit(0)
 
+
 def main():
-        global last_odometer_reset
         # Init some vars..
         telemetry = []
         old_steering = 0
@@ -435,27 +400,24 @@ def main():
         aux1 = 0
         frame_count = 0
         session_full_path = ''
-        last_switch = 0
+        last_switch = 0 # set to 1 for auto-switch
         button_arduino_out = 0
         currently_running = False
         override_autonomous_control = False
         train_on_this_image = True
         vel = 0.0
-        last_odo_queue = []
-        last_millis_queue = []
 
         # Check for insomnia
         #if platform.system() == "Darwin":
         #       check_for_insomnia()
 
         # Setup ports.
-        # port_in, port_out, imu_port = setup_serial_and_reset_arduinos()
+        port_in, port_out, imu_port = setup_serial_and_reset_arduinos()
 
         # Setup tensorflow
         sess, net_model = setup_tensorflow()
 
         # Start the clock.
-        drive_start_time = time.time()
         print 'Awaiting switch flip..'
 
         if we_are_autonomous:
@@ -469,17 +431,11 @@ def main():
                 # Switch was just flipped.
                 if last_switch != button_arduino_out:
                         last_switch = button_arduino_out
-                        # See if the car started up with the switch already flipped.
-                        # if time.time() - drive_start_time < 1:
-                        #       print 'Error: start switch in the wrong position.'
-                        #       sys.exit()
 
                         if button_arduino_out == 1:
                                 currently_running = True
                                 print '%s: Switch flipped.' % frame_count
-                                last_odometer_reset = odometer_ticks
                                 if we_are_recording and (not we_are_autonomous):
-                                        
                                         print 'STARTING TO RECORD.'
                                         print 'Folder: %s' % session_full_path
                                         config.store('last_record_dir', session_full_path)
@@ -504,8 +460,6 @@ def main():
                 # if new_aux1 != None:
                 #       aux1 = new_aux1
 
-                # telemetry = process_imu(imu_port)
-                
 
                 # Check to see if we should stop the car via the RC during TF control.
                 # But also provide a way to re-engage autonomous control after an override.
@@ -520,41 +474,18 @@ def main():
                                                 center_esc(port_out)
                                                 override_autonomous_control = False
 
-                # Check to see if we should reset the odometer via aux1 during manual
-                # driving. This is Button E on the RC transmitter.
-                # The values will swing from ~1100 to ~1900.
-                if abs(aux1 - old_aux1) > 400:
-                        old_aux1 = aux1
-                        print '%s: Resetting the odometer.' % frame_count
-                        last_odometer_reset = odometer_ticks
-
                 # Overwrite steering with neural net output in autonomous mode.
                 # This seems to take about 10ms.
                 if we_are_autonomous and currently_running:
-                        # Calculate velocity from odometer. Gets weird when stopped.
-                        last_odo = last_odo_queue[-config.odo_delta]
-                        last_millis = last_millis_queue[-config.odo_delta]
-                        vel = 0
-                        if odometer_ticks != last_odo and milliseconds > last_millis:
-                                if milliseconds - last_millis == 0: vel = 0
-                                else: vel = (float(odometer_ticks) - last_odo) / (milliseconds - last_millis)
-                                if last_millis == 0 and last_odo == 0: vel = 0
-                                if last_odo >= odometer_ticks: vel = 0
-                        # append to circular queue
-                        last_odo_queue.append(odometer_ticks)
-                        last_millis_queue.append(milliseconds)
-                        if len(last_odo_queue) > config.odo_delta: last_odo_queue = last_odo_queue[1:]
-                        if len(last_millis_queue) > config.odo_delta: last_millis_queue = last_millis_queue[1:]
                         # Read a frame from the camera.
                         frame = camera_stream.read()
-                        steering, throttle = do_tensorflow(sess, net_model, frame, odometer_ticks - last_odometer_reset, vel)
+                        # Hard code odo_ticks for pinball purposes
+                        odo_ticks = 0
+                        steering, throttle = do_tensorflow(sess, net_model, frame, odo_ticks, vel)
                         if ((frame_count % 25) == 0) and (vel != 0):
                                 # Simulate dropped radio frames from  rc
                                 #throttle = 0
                                 pass
-                                
-
-                        # steering, throttle = do_tensor_flow(frame, odometer_ticks - last_odometer_reset, vel)
 
                 if we_are_recording and currently_running:
                         # TODO(matt): also record vel in filename for tf?
@@ -566,7 +497,6 @@ def main():
                                 "_thr_" + str(throttle) +
                                 "_ste_" + str(steering) +
                                 "_mil_" + str(milliseconds) +
-                                "_odo_" + str(odometer_ticks - last_odometer_reset).zfill(5) +
                                 ".png", frame)
                 else:
                         frame = camera_stream.read()
