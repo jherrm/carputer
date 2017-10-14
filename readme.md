@@ -9,6 +9,15 @@ The process is to record, train, and then run autonomously, as seen in the steps
 
 This is an experimental setup, so it's not super-clean code or hardware.
 
+## Setting up development on mac
+
+* install virtualenv and homebrew
+* create a virutalenv called flipbot `virtualenv flipbot`
+* Activate your virtualenv: `source flipbot/bin/activate`
+* `brew install freetype`
+* `pip install --upgrade pip`
+* `pip install -r requirements.txt`
+
 ## Recording pipline
 0. Turn on ESC, RC controller. Plug in battery, USB. Start switch to off.
 0. Run InsomniaX and disable lid sleep and idle sleep.
