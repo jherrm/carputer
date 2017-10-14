@@ -11,6 +11,7 @@ import re
 import sys
 import time
 import subprocess
+import errno
 
 import cv2
 from docopt import docopt
@@ -75,6 +76,20 @@ button_arduino_in = 0
 imu_stream = ''
 
 
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+def touch(path):
+    with open(path, 'a'):
+        os.utime(path, None)
+
+
 def setup_serial_and_reset_arduinos():
         # This will set up the serial ports. If they are already set up, it will
         # reset them, which also resets the Arduinos.
@@ -107,10 +122,12 @@ def setup_serial_and_reset_arduinos():
 def make_data_folder(base_path):
         # Make a new dir to store data.
         base_path = os.path.expanduser(base_path)
+        mkdir_p(base_path)
         session_dir_name = time.strftime('%Y_%m_%d__%H_%M_%S_%p')
         session_full_path = os.path.join(base_path, session_dir_name)
 
         logging_path = session_full_path + "_imu.log"
+        touch(logging_path)
 
         data_logger.init_logging(logging_path)
 
@@ -445,7 +462,6 @@ def main():
                 print("Warning, we are intending to drive with tensorflow")
 
         session_full_path = make_data_folder('./training-images')
-        os.mkdirp(session_full_path)
 
         while True:
                 loop_start_time = time.time()
