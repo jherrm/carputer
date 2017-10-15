@@ -425,6 +425,23 @@ def main():
 
         session_full_path = make_data_folder('./training-images')
 
+
+        # This block is copied from below, and is a temporary hack to make recording auto-start
+        currently_running = True
+        print '%s: Switch flipped.' % frame_count
+        if we_are_recording and (not we_are_autonomous):
+                print 'STARTING TO RECORD.'
+                print 'Folder: %s' % session_full_path
+                config.store('last_record_dir', session_full_path)
+        elif we_are_recording and we_are_autonomous:
+                session_full_path = make_data_folder('~/tf-driving-images')
+                print 'DRIVING AUTONOMOUSLY and STARTING TO RECORD'
+                print 'Folder: %s' % session_full_path
+        else:
+                print("DRIVING AUTONOMOUSLY (not recording).")
+        # Endhack
+
+
         while True:
                 loop_start_time = time.time()
 
