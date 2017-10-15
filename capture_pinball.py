@@ -2,7 +2,6 @@
 import tkinter
 import serial
 import config
-import camera
 import cv2
 import os
 # ser = serial.Serial('/dev/cu.usbmodem1411', 115200)
@@ -34,7 +33,7 @@ class MainLoop(object):
 
         frame.pack()
         frame.focus_set()
-        self.camera_stream = camera.CameraStream(src=config.camera_id).start()
+        self.setup_cam()
         self.frame_index = 0
         self.is_left_down = False
         self.is_right_down = False
@@ -47,14 +46,29 @@ class MainLoop(object):
         tk.after(33, self.on_frame)
         tk.mainloop()
 
+    def setup_cam(self, src=0):
+        self.camera_stream = cv2.VideoCapture(src)
+        if not self.camera_stream.isOpened():
+            src = 1 - src
+            self.camera_stream = cv2.VideoCapture(src)
+            if not self.camera_stream.isOpened():
+                sys.exit("Error: Camera didn't open for capture.")
+
+        # Setup frame dims.
+        self.camera_stream.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+        self.camera_stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+
+        self.camera_stream.read()
+
     def on_frame(self):
         self.frame_index += 1
         if self.is_recording:
             fname = 'sessions/%d/test_%09d_%d_%d.jpg' % (self.episode_index,
-                                                             self.frame_index,
-                                                             self.is_left_down,
-                                                             self.is_right_down)
-            frame = self.camera_stream.read()
+                                                         self.frame_index,
+                                                         self.is_left_down,
+                                                         self.is_right_down)
+            # hmmm, whats grabbed?
+            grabbed, frame = self.camera_stream.read()
             cv2.imwrite(fname, frame)
 
         tk.after(10, self.on_frame)
@@ -99,6 +113,7 @@ class MainLoop(object):
                 os.mkdir(target_path)
         else:
             print("chillin'")
+
     def on_key_press(self, event):
         # print("on_key_press", repr(event.char))
         print("press", event.keycode)
