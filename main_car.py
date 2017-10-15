@@ -95,11 +95,10 @@ def setup_serial_and_reset_arduinos():
         # screen /dev/tty.[yourSerialPortName] [yourBaudRate]
         if os.name == 'nt':
                 name_in = 'COM3'
-                name_out = 'COM4'
         else:
-                name_in = '/dev/tty.usbmodem14211'  # 5v Arduino Uno (16 bit)
-                name_out = '/dev/tty.usbmodem1411'  # 3.3v Arduino Due (32 bit)
-        # 5 volt Arduino Duemilanove, radio controller for input.
+                name_in = '/dev/tty.usbmodem1411'  # 5v Arduino Uno (16 bit)
+                name_out = '/dev/tty.usbmodem1411'
+        # 5 volt Arduino Uno
         port_in = None
         # port_in = serial.Serial(name_in, 38400, timeout=0.0)
         # 3 volt Arduino Due, servos for output.
@@ -190,7 +189,7 @@ def process_input(port_in, port_out):
                                                 #     accel = [float(sp[8]), float(sp[9]), float(sp[10])]
                                                 # except:
                                                 #     accel = [0.0, 0.0, 0.0]
-                                                
+
                                                 # telemetry = quat + gyro + accel
                 if line[0:6] == 'Button':
                         sp = line.split('\t')
@@ -229,7 +228,7 @@ def stop_car(steering, throttle, port_out):
 
 
 def center_esc(port_out):
-        # 90 Throttle centers the esc 
+        # 90 Throttle centers the esc
         process_output(-1, -1, 90, 90, port_out)
 
         #process_output(-1, -1, steering, throttle, port_out)
