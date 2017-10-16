@@ -1,18 +1,9 @@
-
-import tkinter
-import serial
-import config
+import Tkinter as tkinter
+import sys
 import cv2
 import os
-# ser = serial.Serial('/dev/cu.usbmodem1411', 115200)
 
-
-class DummySerial(object):
-    def write(self, val):
-        print('dummy write %s' % val)
-
-
-ser = DummySerial()
+import pinball
 
 tk = tkinter.Tk()
 
@@ -34,9 +25,8 @@ class MainLoop(object):
         frame.pack()
         frame.focus_set()
         self.setup_cam()
+        self.setup_pinball()
         self.frame_index = 0
-        self.is_left_down = False
-        self.is_right_down = False
         self.is_recording = False
         self.episode_index = 0
         if not os.path.exists('sessions'):
@@ -60,47 +50,31 @@ class MainLoop(object):
 
         self.camera_stream.read()
 
+    def setup_pinball(self):
+        self.pinball = pinball.DummyPinball()
+        #self.pinball = pinball.Pinball()
+
     def on_frame(self):
         self.frame_index += 1
         if self.is_recording:
             fname = 'sessions/%d/test_%09d_%d_%d.jpg' % (self.episode_index,
                                                          self.frame_index,
-                                                         self.is_left_down,
-                                                         self.is_right_down)
+                                                         self.pinball.is_left_down,
+                                                         self.pinball.is_right_down)
             # hmmm, whats grabbed?
             grabbed, frame = self.camera_stream.read()
             cv2.imwrite(fname, frame)
 
         tk.after(10, self.on_frame)
 
-    def flip_left(self):
-        print("Flip left")
-        ser.write(b'2')
-        self.is_left_down = True
-
-    def flip_right(self):
-        print("Flip Right")
-        ser.write(b'0')
-        self.is_right_down = True
-
-    def release_left(self):
-        print('Release Left')
-        ser.write(b'3')
-        self.is_left_down = False
-
-    def release_right(self):
-        print("Release Right")
-        ser.write(b'1')
-        self.is_right_down = False
-
     def on_key_release(self, event):
         global has_prev_key_release
         has_prev_key_release = None
         # print("on_key_release", repr(event.char))
         if event.keycode == left_code:
-            self.release_left()
+            self.pinball.release_left()
         elif event.keycode == right_code:
-            self.release_right()
+            self.pinball.release_right()
 
     def spacebar_toggle(self):
         self.is_recording = not self.is_recording
@@ -118,9 +92,9 @@ class MainLoop(object):
         # print("on_key_press", repr(event.char))
         print("press", event.keycode)
         if event.keycode == left_code:
-            self.flip_left()
+            self.pinball.flip_left()
         elif event.keycode == right_code:
-            self.flip_right()
+            self.pinball.flip_right()
         elif event.keycode == space_code:
             self.spacebar_toggle()
 
